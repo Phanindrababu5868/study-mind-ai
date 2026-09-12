@@ -12,6 +12,44 @@ const generateToken = (id) => {
     );
 };
 
+// 7 days in ms — matches the default token expiry above.
+const COOKIE_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
+
+const publicUser = (user) => ({
+    id: user._id,
+    username: user.username,
+    email: user.email,
+    profileImage: user.profileImage,
+    createdAt: user.createdAt,
+});
+
+function setAuthCookies(res, token, user) {
+    const isProd = process.env.NODE_ENV === "production";
+
+    // httpOnly: JS on the frontend can never read this, only the browser
+    // sends it back automatically on same-site requests.
+    res.cookie("token", token, {
+        httpOnly: true,
+        secure: isProd,
+        sameSite: "lax",
+        maxAge: COOKIE_MAX_AGE,
+    });
+
+    // Readable by the frontend so Redux can hydrate instantly on first paint
+    // without waiting on a /profile round trip. Never put the token in here.
+    res.cookie("user_info", JSON.stringify(publicUser(user)), {
+        httpOnly: false,
+        secure: isProd,
+        sameSite: "lax",
+        maxAge: COOKIE_MAX_AGE,
+    });
+}
+
+function clearAuthCookies(res) {
+    res.clearCookie("token");
+    res.clearCookie("user_info");
+}
+
 // ============================================================
 // @desc    Register new user
 // @route   POST /api/auth/register
@@ -56,18 +94,15 @@ export const register = async (req, res, next) => {
             password,
         });
 
+        const token = generateToken(user._id);
+        setAuthCookies(res, token, user);
+
         // Send response
         return res.status(201).json({
             success: true,
             message: "User registered successfully",
-            user: {
-                id: user._id,
-                username: user.username,
-                email: user.email,
-                profileImage: user.profileImage,
-                createdAt: user.createdAt,
-            },
-            token: generateToken(user._id),
+            user: publicUser(user),
+            token,
         });
     } catch (error) {
         next(error);
@@ -114,21 +149,32 @@ export const login = async (req, res, next) => {
             });
         }
 
+        const token = generateToken(user._id);
+        setAuthCookies(res, token, user);
+
         // Send response
         return res.status(200).json({
             success: true,
             message: "Login successful",
-            user: {
-                id: user._id,
-                username: user.username,
-                email: user.email,
-                profileImage: user.profileImage,
-            },
-            token: generateToken(user._id),
+            user: publicUser(user),
+            token,
         });
     } catch (error) {
         next(error);
     }
+};
+
+// ============================================================
+// @desc    Log out current user
+// @route   POST /api/auth/logout
+// @access  Public (just clears whatever auth cookies are present)
+// ============================================================
+export const logout = async (req, res) => {
+    clearAuthCookies(res);
+    return res.status(200).json({
+        success: true,
+        message: "Logged out successfully",
+    });
 };
 
 // ============================================================
@@ -151,11 +197,7 @@ export const getProfile = async (req, res, next) => {
         return res.status(200).json({
             success: true,
             user: {
-                id: user._id,
-                username: user.username,
-                email: user.email,
-                profileImage: user.profileImage,
-                createdAt: user.createdAt,
+                ...publicUser(user),
                 updatedAt: user.updatedAt,
             },
         });
@@ -198,15 +240,19 @@ export const updateProfile = async (req, res, next) => {
 
         const updatedUser = await user.save();
 
+        // The readable user_info cookie is a cached copy — keep it in sync
+        // whenever the underlying profile changes.
+        res.cookie("user_info", JSON.stringify(publicUser(updatedUser)), {
+            httpOnly: false,
+            secure: process.env.NODE_ENV === "production",
+            sameSite: "lax",
+            maxAge: COOKIE_MAX_AGE,
+        });
+
         return res.status(200).json({
             success: true,
             message: "Profile updated successfully",
-            user: {
-                id: updatedUser._id,
-                username: updatedUser.username,
-                email: updatedUser.email,
-                profileImage: updatedUser.profileImage,
-            },
+            user: publicUser(updatedUser),
         });
     } catch (error) {
         next(error);

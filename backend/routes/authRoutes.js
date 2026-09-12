@@ -3,6 +3,7 @@ import { body } from 'express-validator'
 import {
     register,
     login,
+    logout,
     getProfile,
     updateProfile,
     changePassword
@@ -43,6 +44,7 @@ const loginValidation = [
 // Public routes
 router.post('/register', registerValidation, register);
 router.post('/login', loginValidation, login);
+router.post('/logout', logout);
 
 // Protected routes
 router.get('/profile', protect, getProfile);

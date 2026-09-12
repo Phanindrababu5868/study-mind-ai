@@ -3,6 +3,7 @@ dotenv.config()
 
 import express from 'express';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import path from 'path' ;
 import {fileURLToPath} from 'url'
 import connectDB from './config/db.js'
@@ -29,8 +30,10 @@ const app=express()
 connectDB()
 
 // MiddleWare to handle CROS
+// NOTE: cookies + `credentials: true` require an explicit origin — a
+// wildcard '*' is rejected by browsers whenever a request carries cookies.
 app.use(cors({
-    origin:'*',
+    origin: process.env.CLIENT_URL || 'http://localhost:5173',
     methods:['GET','POST','PUT','DELETE'],
     allowedHeaders:['Content-Type','Authorization'],
     credentials:true
@@ -39,6 +42,7 @@ app.use(cors({
 
 app.use(express.json())
 app.use(express.urlencoded({extended:true}))
+app.use(cookieParser())
 
 // static folder for upload
 
