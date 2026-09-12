@@ -5,11 +5,15 @@ const protect = async (req, res, next) => {
     try {
         let token;
 
-        // Expect header: Authorization: Bearer <token>
-        const authHeader = req.headers.authorization;
-
-        if (authHeader && authHeader.startsWith("Bearer ")) {
-            token = authHeader.split(" ")[1];
+        // Prefer the httpOnly cookie (browser clients); fall back to the
+        // Authorization header for non-browser API consumers.
+        if (req.cookies?.token) {
+            token = req.cookies.token;
+        } else {
+            const authHeader = req.headers.authorization;
+            if (authHeader && authHeader.startsWith("Bearer ")) {
+                token = authHeader.split(" ")[1];
+            }
         }
 
         if (!token) {
