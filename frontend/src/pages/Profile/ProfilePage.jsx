@@ -1,39 +1,27 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import PageHeader from "../../components/common/PageHeader";
 import Button from "../../components/common/Button";
-import Spinner from "../../components/common/Spinner";
 import authService from "../../services/authService";
-import { useAuth } from "../../context/AuthContext";
+import { useSelector } from "react-redux";
+import { selectUser } from "../../store/slices/authSlice";
 import toast from "react-hot-toast";
 import { User, Mail, Lock } from "lucide-react";
 
 const ProfilePage = () => {
 
-  const [loading, setLoading] = useState(true);
   const [passwordLoading, setPasswordLoading] = useState(false);
 
-  const [username, setUsername] = useState("");
-  const [email, setEmail] = useState("");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
 
-   useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        const { data } = await authService.getProfile();
-        setUsername(data.username);
-        setEmail(data.email);
-      } catch (error) {
-        toast.error("Failed to fetch profile data.");
-        console.error(error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchProfile();
-  }, []);
- 
+  // The profile already lives in the store (hydrated from the user_info
+  // cookie and revalidated on app boot), so there's no need to re-fetch it
+  // here — this removes a network round trip and a full-page spinner.
+  const user = useSelector(selectUser);
+  const username = user?.username || "";
+  const email = user?.email || "";
+
   const handleChangePassword = async (e) => {
     e.preventDefault();
     if (newPassword !== confirmNewPassword) {
@@ -57,10 +45,6 @@ const ProfilePage = () => {
       setPasswordLoading(false);
     }
   }
-
-  if (loading) {
-  return <Spinner />;
-}
 
   return (
     <div>
@@ -135,6 +119,7 @@ const ProfilePage = () => {
                 </div>
                 <input
                   type="password"
+                  autoComplete="new-password"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   required
