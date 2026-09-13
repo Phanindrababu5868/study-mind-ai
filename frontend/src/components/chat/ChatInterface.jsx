@@ -2,13 +2,14 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Send, MessageSquare, Sparkles } from 'lucide-react';
 import { useParams } from 'react-router-dom';
 import aiService from '../../services/aiService';
-import { useAuth } from '../../context/AuthContext';
+import { useSelector } from 'react-redux';
+import { selectUser } from '../../store/slices/authSlice';
 import Spinner from '../common/Spinner';
 import MarkdownRenderer from '../common/MarkdownRenderer';
 
 const ChatInterface = () => {
     const { id: documentId } = useParams();
-    const { user } = useAuth();
+    const user = useSelector(selectUser);
     const [history, setHistory] = useState([]);
     const [message, setMessage] = useState('');
     const [loading, setLoading] = useState(false);

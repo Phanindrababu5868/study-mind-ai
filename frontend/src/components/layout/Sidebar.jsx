@@ -1,7 +1,8 @@
 import React from "react";
 
 import { NavLink, useNavigate } from "react-router-dom";
-import { useAuth } from "../../context/AuthContext";
+import { useDispatch } from "react-redux";
+import { logout } from "../../store/slices/authSlice";
 import {
   LayoutDashboard,
   FileText,
@@ -13,12 +14,14 @@ import {
 } from "lucide-react";
 
 const Sidebar = ({ isSidebarOpen, toggleSidebar }) => {
-  const { logout } = useAuth();
+  const dispatch = useDispatch();
   const navigate = useNavigate();
 
-  const handleLogout = () => {
-    logout();
-    navigate("/login");
+  const handleLogout = async () => {
+    // The thunk clears local state even if the server call fails, so this
+    // always resolves and the redirect always happens.
+    await dispatch(logout());
+    navigate("/login", { replace: true });
   };
 
     const navLinks = [

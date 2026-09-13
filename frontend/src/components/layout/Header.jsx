@@ -1,9 +1,10 @@
 import React from "react";
-import { useAuth } from "../../context/AuthContext";
+import { useSelector } from "react-redux";
+import { selectUser } from "../../store/slices/authSlice";
 import {Bell, User, Menu} from 'lucide-react'
 
 const Header = ({ toggleSidebar }) => {
-  const { user } = useAuth();
+  const user = useSelector(selectUser);
 
   return( 
   <header className="sticky top-0 z-40 w-full h-16 bg-white/80 backdrop-blur-xl border-b border-slate-200/60">
