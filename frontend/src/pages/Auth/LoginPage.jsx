@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
-import authService from '../../services/authService';
+import { useDispatch, useSelector } from 'react-redux';
+import { login, selectAuthLoading } from '../../store/slices/authSlice';
 import { BrainCircuit, Mail, Lock, ArrowRight } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -10,26 +10,27 @@ const LoginPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
   const [focusedField, setFocusedField] = useState(null);
 
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const dispatch = useDispatch();
+  // Loading state lives in the store so it stays correct even if this
+  // component unmounts mid-request.
+  const loading = useSelector(selectAuthLoading);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    setLoading(true);
     try {
-      const { token, user } = await authService.login(email, password);
-      login(user, token);
+      // unwrap() re-throws the rejectWithValue payload so the existing
+      // try/catch keeps working unchanged.
+      await dispatch(login({ email, password })).unwrap();
       toast.success('Logged in successfully!');
-      navigate('/dashboard');
+      navigate('/dashboard', { replace: true });
     } catch (err) {
-      setError(err.message || 'Failed to login. Please check your credentials.');
-      toast.error(err.message || 'Failed to login.');
-    } finally {
-      setLoading(false);
+      const message = typeof err === 'string' ? err : 'Failed to login. Please check your credentials.';
+      setError(message);
+      toast.error(message);
     }
   };
 
@@ -54,7 +55,7 @@ const LoginPage = () => {
           </div>
 
           {/* Form */}
-          <div className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-5" noValidate>
             {/* Email Field */}
             <div className="space-y-2">
               <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wide">
@@ -66,6 +67,8 @@ const LoginPage = () => {
                 </div>
                 <input
                   type="email"
+                  required
+                  autoComplete="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   onFocus={() => setFocusedField('email')}
@@ -88,6 +91,8 @@ const LoginPage = () => {
                 </div>
                 <input
                   type="password"
+                  required
+                  autoComplete="current-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   onFocus={() => setFocusedField('password')}
@@ -107,7 +112,7 @@ const LoginPage = () => {
 
             {/* Submit Button */}
             <button
-              onClick={handleSubmit}
+              type="submit"
               disabled={loading}
               className="group relative w-full h-12 bg-linear-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 active:scale-[0.98] text-white  text-sm font-semibold rounded-xl transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-emerald-500/20 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 shadow-lg shadow-emerald-500/25 overflow-hidden"
             >
@@ -126,7 +131,7 @@ const LoginPage = () => {
               </span>
               <div className="absolute inset-0 bg-linear-to-r from-white/0 via-white/20 to-white/0 -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
             </button>
-          </div>
+          </form>
 
           {/* Footer */}
           <div className="mt-8 pt-6 border-t border-slate-200/60">
