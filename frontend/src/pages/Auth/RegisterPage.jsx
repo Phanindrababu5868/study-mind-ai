@@ -1,47 +1,98 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import authService from '../../services/authService';
-import { BrainCircuit, Mail, Lock, ArrowRight, User } from 'lucide-react';
+import { useDispatch, useSelector } from 'react-redux';
+import { register, selectAuthLoading } from '../../store/slices/authSlice';
+import { isPasswordValid } from '../../utils/passwordValidation';
+import PasswordChecklist from '../../components/auth/PasswordChecklist';
+import { BrainCircuit, Mail, Lock, ArrowRight, User, Calendar, Briefcase } from 'lucide-react';
 import toast from 'react-hot-toast';
 
+// Values must match the AGE_RANGES enum in backend/models/User.js.
+const AGE_RANGE_OPTIONS = [
+  { value: 'under_18', label: 'Under 18' },
+  { value: '18_24', label: '18 - 24' },
+  { value: '25_34', label: '25 - 34' },
+  { value: '35_44', label: '35 - 44' },
+  { value: '45_54', label: '45 - 54' },
+  { value: '55_plus', label: '55 or older' },
+];
+
+const OCCUPATION_OPTIONS = [
+  'Student (School)',
+  'Student (University)',
+  'Teacher / Educator',
+  'Software Engineer',
+  'Healthcare Professional',
+  'Researcher / Academic',
+  'Business / Finance',
+  'Designer / Creative',
+  'Other',
+];
+
+const inputClass =
+  'w-full h-12 pl-12 pr-4 border-2 border-slate-200 rounded-xl bg-slate-50/50 text-slate-900 placeholder-slate-400 text-sm font-medium transition-all duration-200 focus:outline-none focus:border-emerald-500 focus:bg-white focus:shadow-lg focus:shadow-emerald-500/10';
+
 const RegisterPage = () => {
-  const [username, setUsername] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  // Single form object rather than six useState calls — keeps the change
+  // handler generic and avoids a wall of setters.
+  const [form, setForm] = useState({
+    username: '',
+    email: '',
+    password: '',
+    confirmPassword: '',
+    ageRange: '',
+    occupation: '',
+  });
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [focusedField, setFocusedField] = useState(null);
+  const [touchedConfirm, setTouchedConfirm] = useState(false);
 
   const navigate = useNavigate();
+  const dispatch = useDispatch();
+  const loading = useSelector(selectAuthLoading);
+
+  const setField = (name) => (e) =>
+    setForm((prev) => ({ ...prev, [name]: e.target.value }));
+
+  const passwordValid = useMemo(() => isPasswordValid(form.password), [form.password]);
+  const passwordsMatch =
+    form.confirmPassword.length > 0 && form.password === form.confirmPassword;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (password.length < 6) {
-      setError('Password should be at least 6 characters long');
+
+    if (!passwordValid) {
+      setError('Please meet all password requirements below.');
       return;
     }
+    if (!passwordsMatch) {
+      setError('Passwords do not match.');
+      return;
+    }
+
     setError('');
-    setLoading(true);
     try {
-      await authService.register(username, email, password);
-      toast.success('Registration successful! Please log in.');
-      navigate('/login');
+      const { confirmPassword, ...payload } = form;
+      // Registration now logs the user straight in (the server sets the auth
+      // cookies on the register response), so we go to the dashboard rather
+      // than bouncing them to /login to type their password again.
+      await dispatch(register(payload)).unwrap();
+      toast.success('Welcome to StudyMind AI!');
+      navigate('/dashboard', { replace: true });
     } catch (err) {
-      setError(err.message || 'Failed to register. Please try again.');
-      toast.error(err.message || 'Failed to register.');
-    } finally {
-      setLoading(false);
+      const message = typeof err === 'string' ? err : 'Failed to register. Please try again.';
+      setError(message);
+      toast.error(message);
     }
   };
 
   return (
-    <div className="relative flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
+    <div className="relative flex items-center justify-center min-h-screen py-10 bg-gradient-to-br from-slate-50 via-white to-slate-50">
       <div className="absolute inset-0 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] bg-[size:16px_16px] opacity-30" />
 
       <div className="relative w-full max-w-md px-6">
         <div className="bg-white/80 backdrop-blur-xl border border-slate-200/60 rounded-3xl shadow-xl shadow-slate-200/50 p-10">
           {/* Header */}
-          <div className="text-center mb-10">
+          <div className="text-center mb-8">
             <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-500 shadow-lg shadow-emerald-500/25 mb-0">
               <BrainCircuit className="w-7 h-7 text-white" strokeWidth={2} />
             </div>
@@ -49,7 +100,7 @@ const RegisterPage = () => {
               Create your account
             </h1>
             <p className="text-slate-500 text-sm">
-            Start your AI-powred learning Experience
+              Start your AI-powered learning experience
             </p>
           </div>
 
@@ -59,7 +110,7 @@ const RegisterPage = () => {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4" noValidate>
             <div>
               <label htmlFor="username" className="block text-sm font-medium text-slate-700 mb-1">
                 Username
@@ -69,12 +120,12 @@ const RegisterPage = () => {
                 <input
                   id="username"
                   type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  onFocus={() => setFocusedField('username')}
-                  onBlur={() => setFocusedField(null)}
+                  autoComplete="username"
+                  value={form.username}
+                  onChange={setField('username')}
                   required
-                  className="w-full h-12 pl-12 pr-4 border-2 border-slate-200 rounded-xl bg-slate-50/50 text-slate-900 placeholder-slate-400 text-sm font-medium transition-all  duration-200 focus:outline-none focus:border-emerald-500 focus:bg-white focus:shadow-lg foucs:shadow-emerald-500/10"
+                  minLength={3}
+                  className={inputClass}
                   placeholder="janedoe"
                 />
               </div>
@@ -89,14 +140,69 @@ const RegisterPage = () => {
                 <input
                   id="email"
                   type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  onFocus={() => setFocusedField('email')}
-                  onBlur={() => setFocusedField(null)}
+                  autoComplete="email"
+                  value={form.email}
+                  onChange={setField('email')}
                   required
-                  className="w-full h-12 pl-12 pr-4 border-2 border-slate-200 rounded-xl bg-slate-50/50 text-slate-900 placeholder-slate-400 text-sm font-medium transition-all  duration-200 focus:outline-none focus:border-emerald-500 focus:bg-white focus:shadow-lg foucs:shadow-emerald-500/10"
+                  className={inputClass}
                   placeholder="you@example.com"
                 />
+              </div>
+            </div>
+
+            {/* Age range + occupation feed the AI prompt context so generated
+                flashcards, quizzes and explanations match the learner. */}
+            <div>
+              <label htmlFor="ageRange" className="block text-sm font-medium text-slate-700 mb-1">
+                Age range
+              </label>
+              <div className="relative">
+                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
+                <select
+                  id="ageRange"
+                  value={form.ageRange}
+                  onChange={setField('ageRange')}
+                  required
+                  className={`${inputClass} appearance-none cursor-pointer ${
+                    form.ageRange ? 'text-slate-900' : 'text-slate-400'
+                  }`}
+                >
+                  <option value="" disabled>
+                    Select your age range
+                  </option>
+                  {AGE_RANGE_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value} className="text-slate-900">
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label htmlFor="occupation" className="block text-sm font-medium text-slate-700 mb-1">
+                Occupation
+              </label>
+              <div className="relative">
+                <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
+                <select
+                  id="occupation"
+                  value={form.occupation}
+                  onChange={setField('occupation')}
+                  required
+                  className={`${inputClass} appearance-none cursor-pointer ${
+                    form.occupation ? 'text-slate-900' : 'text-slate-400'
+                  }`}
+                >
+                  <option value="" disabled>
+                    Select your occupation
+                  </option>
+                  {OCCUPATION_OPTIONS.map((opt) => (
+                    <option key={opt} value={opt} className="text-slate-900">
+                      {opt}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 
@@ -109,15 +215,42 @@ const RegisterPage = () => {
                 <input
                   id="password"
                   type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  onFocus={() => setFocusedField('password')}
-                  onBlur={() => setFocusedField(null)}
+                  autoComplete="new-password"
+                  value={form.password}
+                  onChange={setField('password')}
                   required
-                  className="w-full h-12 pl-12 pr-4 border-2 border-slate-200 rounded-xl bg-slate-50/50 text-slate-900 placeholder-slate-400 text-sm font-medium transition-all  duration-200 focus:outline-none focus:border-emerald-500 focus:bg-white focus:shadow-lg foucs:shadow-emerald-500/10"
-                  placeholder="At least 6 characters"
+                  className={inputClass}
+                  placeholder="Create a strong password"
                 />
               </div>
+              <PasswordChecklist password={form.password} />
+            </div>
+
+            <div>
+              <label htmlFor="confirmPassword" className="block text-sm font-medium text-slate-700 mb-1">
+                Confirm password
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                <input
+                  id="confirmPassword"
+                  type="password"
+                  autoComplete="new-password"
+                  value={form.confirmPassword}
+                  onChange={setField('confirmPassword')}
+                  onBlur={() => setTouchedConfirm(true)}
+                  required
+                  className={`${inputClass} ${
+                    touchedConfirm && form.confirmPassword && !passwordsMatch
+                      ? 'border-red-300'
+                      : ''
+                  }`}
+                  placeholder="Re-enter your password"
+                />
+              </div>
+              {touchedConfirm && form.confirmPassword && !passwordsMatch && (
+                <p className="mt-1 text-xs text-red-500">Passwords do not match.</p>
+              )}
             </div>
 
             <button
