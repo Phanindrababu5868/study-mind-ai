@@ -1,5 +1,6 @@
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
+import { validatePassword } from "../utils/passwordValidation.js";
 
 // Generate JWT token
 const generateToken = (id) => {
@@ -19,6 +20,8 @@ const publicUser = (user) => ({
     id: user._id,
     username: user.username,
     email: user.email,
+    ageRange: user.ageRange,
+    occupation: user.occupation,
     profileImage: user.profileImage,
     createdAt: user.createdAt,
 });
@@ -57,13 +60,23 @@ function clearAuthCookies(res) {
 // ============================================================
 export const register = async (req, res, next) => {
     try {
-        const { username, email, password } = req.body||{};
+        const { username, email, password, ageRange, occupation } = req.body||{};
 
         // Validate required fields
-        if (!username || !email || !password) {
+        if (!username || !email || !password || !ageRange || !occupation) {
             return res.status(400).json({
                 success: false,
-                message: "Please provide username, email and password",
+                message: "Please provide username, email, password, age range and occupation",
+                statusCode: 400,
+            });
+        }
+
+        const passwordCheck = validatePassword(password);
+        if (!passwordCheck.valid) {
+            return res.status(400).json({
+                success: false,
+                message: passwordCheck.message,
+                failedRules: passwordCheck.failedRules,
                 statusCode: 400,
             });
         }
@@ -92,6 +105,8 @@ export const register = async (req, res, next) => {
             username,
             email,
             password,
+            ageRange,
+            occupation,
         });
 
         const token = generateToken(user._id);
@@ -213,7 +228,7 @@ export const getProfile = async (req, res, next) => {
 // ============================================================
 export const updateProfile = async (req, res, next) => {
     try {
-        const { username, email, profileImage } = req.body||{};
+        const { username, email, profileImage, ageRange, occupation } = req.body||{};
 
         const user = await User.findById(req.user._id);
 
@@ -236,6 +251,14 @@ export const updateProfile = async (req, res, next) => {
 
         if (profileImage) {
             user.profileImage = profileImage;
+        }
+
+        if (ageRange) {
+            user.ageRange = ageRange;
+        }
+
+        if (occupation) {
+            user.occupation = occupation;
         }
 
         const updatedUser = await user.save();
@@ -273,6 +296,16 @@ export const changePassword = async (req, res, next) => {
             return res.status(400).json({
                 success: false,
                 message: "Please provide current and new password",
+                statusCode: 400,
+            });
+        }
+
+        const newPasswordCheck = validatePassword(newPassword);
+        if (!newPasswordCheck.valid) {
+            return res.status(400).json({
+                success: false,
+                message: newPasswordCheck.message,
+                failedRules: newPasswordCheck.failedRules,
                 statusCode: 400,
             });
         }
