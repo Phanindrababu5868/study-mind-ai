@@ -1,6 +1,9 @@
 
 import mongoose from "mongoose";
 import bcrypt from "bcrypt";
+import { validatePassword, MAX_LENGTH } from "../utils/passwordValidation.js";
+
+export const AGE_RANGES = ["under_18", "18_24", "25_34", "35_44", "45_54", "55_plus"];
 
 const userSchema = new mongoose.Schema(
   {
@@ -27,8 +30,33 @@ const userSchema = new mongoose.Schema(
     password: {
       type: String,
       required: [true, "Please provide a password"],
-      minlength: [6, "Password must be at least 6 characters long"],
+      maxlength: MAX_LENGTH,
       select: false,
+      // Only runs when the plaintext password is being set (pre-save hashes
+      // it right after, so this never re-validates the bcrypt hash later).
+      validate: {
+        validator: function (value) {
+          if (!this.isModified("password")) return true;
+          return validatePassword(value).valid;
+        },
+        message: (props) => validatePassword(props.value).message || "Password does not meet strength requirements",
+      },
+    },
+
+    ageRange: {
+      type: String,
+      required: [true, "Please provide your age range"],
+      enum: {
+        values: AGE_RANGES,
+        message: "Please provide a valid age range",
+      },
+    },
+
+    occupation: {
+      type: String,
+      required: [true, "Please provide your occupation"],
+      trim: true,
+      maxlength: [120, "Occupation must be no more than 120 characters"],
     },
 
     profileImage: {
