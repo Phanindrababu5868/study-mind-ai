@@ -12,14 +12,46 @@ if (!process.env.GEMINI_API_KEY) {
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
+const AGE_RANGE_LABELS = {
+  under_18: "under 18",
+  "18_24": "18–24",
+  "25_34": "25–34",
+  "35_44": "35–44",
+  "45_54": "45–54",
+  "55_plus": "55+",
+};
+
+/**
+ * Builds a short "learner profile" line from the signed-in user's age range
+ * and occupation, so Gemini can tailor vocabulary, tone, and examples
+ * (e.g. simpler language for younger learners, workplace-relevant examples
+ * for a working professional). Returns '' when no profile is available, so
+ * callers can splice it into a prompt unconditionally.
+ */
+const buildProfileContext = (user) => {
+  if (!user) return "";
+
+  const parts = [];
+  if (user.ageRange) parts.push(`Age range: ${AGE_RANGE_LABELS[user.ageRange] || user.ageRange}`);
+  if (user.occupation) parts.push(`Occupation: ${user.occupation}`);
+
+  if (!parts.length) return "";
+
+  return `Learner profile (use this to tailor tone, vocabulary and examples — do not mention this profile explicitly):
+${parts.join("\n")}
+
+`;
+};
+
 /**
  * Generate flashcards from text
  * @param {string} text - Document text
  * @param {number} count - Number of flashcards to generate
+ * @param {{ageRange?: string, occupation?: string}} [user] - Requesting user, for AI personalization
  * @returns {Promise<Array<{question: string, answer: string, difficulty: string}>>}
  */
-export const generateFlashcards = async (text, count = 10) => {
-  const prompt = `Generate exactly ${count} educational flashcards from the following text.
+export const generateFlashcards = async (text, count = 10, user = null) => {
+  const prompt = `${buildProfileContext(user)}Generate exactly ${count} educational flashcards from the following text.
   Format each flashcard as:
   Q: [Clear, specific question]
   A: [Concise, accurate answer]
@@ -77,8 +109,8 @@ export const generateFlashcards = async (text, count = 10) => {
  * @param {number} numQuestions - Number of questions
  * @returns {Promise<Array<{question: string, options: Array, correctAnswer: string, explanation: string, difficulty: string}>>}
  */
-export const generateQuiz = async (text, numQuestions = 5) => {
-  const prompt = `Generate exactly ${numQuestions} multiple choice questions from the following text.
+export const generateQuiz = async (text, numQuestions = 5, user = null) => {
+  const prompt = `${buildProfileContext(user)}Generate exactly ${numQuestions} multiple choice questions from the following text.
   Format each question as:
   Q: [Question]
   O1: [Option 1]
@@ -144,8 +176,8 @@ export const generateQuiz = async (text, numQuestions = 5) => {
  * @param {string} text - Document text
  * @returns {Promise<string>}
  */
-export const generateSummary = async (text) => {
-  const prompt = `Provide a concise summary of the following text, highlighting the key concepts, main ideas and important points.
+export const generateSummary = async (text, user = null) => {
+  const prompt = `${buildProfileContext(user)}Provide a concise summary of the following text, highlighting the key concepts, main ideas and important points.
   Keep the summary clear and structured.
 
   Text:
@@ -170,10 +202,10 @@ export const generateSummary = async (text) => {
  * @param {Array<Object>} chunks - Relevant document chunks
  * @returns {Promise<string>}
  */
-export const chatWithContext = async (question, chunks) => {
+export const chatWithContext = async (question, chunks, user = null) => {
   const context = chunks.map((c, i) => `[Chunk ${i + 1}]\n${c.content}`).join('\n\n');
 
-  const prompt = `Based on the following context from a document, Analyse the context and answer the user's questions
+  const prompt = `${buildProfileContext(user)}Based on the following context from a document, Analyse the context and answer the user's questions
   If the answer is not in the context, say so.
 
   Context:
@@ -202,8 +234,8 @@ export const chatWithContext = async (question, chunks) => {
  * @param {string} context - Relevant context
  * @returns {Promise<string>}
  */
-export const explainConcept = async (concept, context) => {
-  const prompt = `Explain the concept of "${concept}" based on the following context.
+export const explainConcept = async (concept, context, user = null) => {
+  const prompt = `${buildProfileContext(user)}Explain the concept of "${concept}" based on the following context.
   Provide a clear, educational explanation that's easy to understand.
   Include examples if relevant.
 

@@ -37,7 +37,8 @@ export const generateFlashcards = async (req, res, next) => {
     // Generate flashcards using Gemini
     const cards = await geminiService.generateFlashcards(
       document.extractedText,
-      parseInt(count)
+      parseInt(count),
+      req.user
     );
 
     // Save to database
@@ -96,7 +97,8 @@ export const generateQuiz = async (req, res, next) => {
     // Generate quiz using Gemini
     const questions = await geminiService.generateQuiz(
       document.extractedText,
-      parseInt(numQuestions)
+      parseInt(numQuestions),
+      req.user
     );
 
     // Save to database
@@ -150,7 +152,7 @@ export const generateSummary = async (req, res, next) => {
         }
 
         // Generate summary using Gemini
-        const summary = await geminiService.generateSummary(document.extractedText)
+        const summary = await geminiService.generateSummary(document.extractedText, req.user)
         res.status(201).json({
         success: true,
         data: {
@@ -214,7 +216,7 @@ export const chat = async (req, res, next) => {
     }
 
     // Generate response using Gemini
-    const answer = await geminiService.chatWithContext(question, relevantChunks);
+    const answer = await geminiService.chatWithContext(question, relevantChunks, req.user);
 
     // Save conversation
     chatHistory.messages.push(
@@ -283,7 +285,7 @@ export const explainConcept = async (req, res, next) => {
     const context = relevantChunks.map(c => c.content).join('\n\n');
 
     // Generate explanation using Gemini
-    const explanation = await geminiService.explainConcept(concept, context);
+    const explanation = await geminiService.explainConcept(concept, context, req.user);
 
     res.status(200).json({
       success: true,
