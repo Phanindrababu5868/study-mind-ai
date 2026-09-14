@@ -4,6 +4,8 @@ import Button from "../../components/common/Button";
 import authService from "../../services/authService";
 import { useSelector } from "react-redux";
 import { selectUser } from "../../store/slices/authSlice";
+import { isPasswordValid } from "../../utils/passwordValidation";
+import PasswordChecklist from "../../components/auth/PasswordChecklist";
 import toast from "react-hot-toast";
 import { User, Mail, Lock } from "lucide-react";
 
@@ -28,8 +30,8 @@ const ProfilePage = () => {
       toast.error("New passwords do not match.");
       return;
     }
-    if (newPassword.length < 6) {
-      toast.error("New password must be at least 6 characters long.");
+    if (!isPasswordValid(newPassword)) {
+      toast.error("New password does not meet the strength requirements.");
       return;
     }
     setPasswordLoading(true);
@@ -126,6 +128,7 @@ const ProfilePage = () => {
                   className="w-full h-9 pl-9 pr-3 border border-neutral-200 rounded-lg bg-white text-sm text-neutral-900 placeholder-neutral-400 transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-[#00d492] focus:border-transparent"
                 />
               </div>
+              <PasswordChecklist password={newPassword} />
             </div>
             <div>
               <label className="block text-xs font-medium text-neutral-700 mb-1.5">
