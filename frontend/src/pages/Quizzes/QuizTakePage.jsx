@@ -55,17 +55,24 @@ const QuizTakePage = () => {
   const handleSubmitQuiz = async () => {
     setSubmitting(true);
     try {
-      const formattedAnswers = Object.keys(selectedAnswers).map(questionId => {
-        const question = quiz.questions.find(q => q._id === questionId);
-        const questionIndex = quiz.questions.findIndex(q => q._id === questionId);
-        const optionIndex = selectedAnswers[questionId];
-        const selectedAnswer = question.options[optionIndex];
-        return { questionIndex, selectedAnswer };
+      // Build the payload by walking the question list in order, rather than
+      // iterating the answers object. Object.keys() would silently drop
+      // skipped questions AND return them in insertion order (the order the
+      // user happened to click), so questionIndex could end up misaligned.
+      const formattedAnswers = quiz.questions.map((question, questionIndex) => {
+        const optionIndex = selectedAnswers[question._id];
+        return {
+          questionIndex,
+          // Unanswered questions are submitted as null so the server still
+          // counts them (as incorrect) and the score denominator is right.
+          selectedAnswer:
+            optionIndex === undefined ? null : question.options[optionIndex],
+        };
       });
 
       await quizService.submitQuiz(quizId, formattedAnswers);
       toast.success('Quiz submitted successfully!');
-      navigate(`/quizzes/${quizId}/results`);
+      navigate(`/quizzes/${quizId}/results`, { replace: true });
     } catch (error) {
       toast.error(error.message || 'Failed to submit quiz.');
     } finally {
