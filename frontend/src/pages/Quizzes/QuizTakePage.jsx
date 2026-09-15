@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, CheckCircle2 } from 'lucide-react';
 import quizService from '../../services/quizService';
 import PageHeader from '../../components/common/PageHeader';
+import PaginationDots from '../../components/common/PaginationDots';
 import Spinner from '../../components/common/Spinner';
 import toast from 'react-hot-toast';
 import Button from '../../components/common/Button';
@@ -33,24 +34,23 @@ const QuizTakePage = () => {
     fetchQuiz();
   }, [quizId]);
 
-  const handleOptionChange = (questionId, optionIndex) => {
-    setSelectedAnswers((prev) => ({
-      ...prev,
-      [questionId]: optionIndex,
-    }));
-  };
+  const handleOptionChange = useCallback((questionId, optionIndex) => {
+    setSelectedAnswers((prev) => {
+      // No-op guard: re-selecting the same option shouldn't trigger a render.
+      if (prev[questionId] === optionIndex) return prev;
+      return { ...prev, [questionId]: optionIndex };
+    });
+  }, []);
 
-  const handleNextQuestion = () => {
-    if (currentQuestionIndex < quiz.questions.length - 1) {
-      setCurrentQuestionIndex((prev) => prev + 1);
-    }
-  };
+  const totalQuestions = quiz?.questions.length ?? 0;
 
-  const handlePreviousQuestion = () => {
-    if (currentQuestionIndex > 0) {
-      setCurrentQuestionIndex((prev) => prev - 1);
-    }
-  };
+  const handleNextQuestion = useCallback(() => {
+    setCurrentQuestionIndex((prev) => Math.min(prev + 1, totalQuestions - 1));
+  }, [totalQuestions]);
+
+  const handlePreviousQuestion = useCallback(() => {
+    setCurrentQuestionIndex((prev) => Math.max(prev - 1, 0));
+  }, []);
 
   const handleSubmitQuiz = async () => {
     setSubmitting(true);
@@ -73,6 +73,17 @@ const QuizTakePage = () => {
     }
   };
 
+  // Indexes of answered questions, for the progress dots. Declared here —
+  // above the early returns — because hooks must run unconditionally on
+  // every render. Guarded with `quiz?.` since this runs while still loading.
+  const answeredIndexes = useMemo(() => {
+    if (!quiz) return [];
+    return quiz.questions.reduce((acc, question, index) => {
+      if (selectedAnswers[question._id] !== undefined) acc.push(index);
+      return acc;
+    }, []);
+  }, [quiz, selectedAnswers]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -92,8 +103,8 @@ const QuizTakePage = () => {
   }
 
   const currentQuestion = quiz.questions[currentQuestionIndex];
-  const isAnswered = selectedAnswers.hasOwnProperty(currentQuestion._id);
   const answeredCount = Object.keys(selectedAnswers).length;
+  const isLastQuestion = currentQuestionIndex === quiz.questions.length - 1;
 
     return (
     <div className="max-w-4xl mx-auto">
@@ -186,6 +197,18 @@ const QuizTakePage = () => {
 
       </div>
 
+      {/* Progress indicator — display only. Navigation is intentionally
+          limited to the Previous / Next buttons below, so questions are
+          answered in order rather than skipped around. */}
+      <div className="mb-6">
+        <PaginationDots
+          total={quiz.questions.length}
+          current={currentQuestionIndex}
+          completed={answeredIndexes}
+          label="Quiz progress"
+        />
+      </div>
+
       {/* Navigation Buttons */}
       <div className="flex items-center justify-between gap-4">
           <Button
@@ -197,7 +220,7 @@ const QuizTakePage = () => {
             Previous
           </Button>
 
-          {currentQuestionIndex === quiz.questions.length - 1 ? (
+          {isLastQuestion ? (
             <button
               onClick={handleSubmitQuiz}
               disabled={submitting}
@@ -227,33 +250,6 @@ const QuizTakePage = () => {
               <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform duration-700" strokeWidth={2.5} />
             </Button>
           )}
-      </div>
-
-      {/* Question Navigation Dots */}
-      <div className="mt-2 flex items-center justify-between gap-2 flex-wrap">
-        {quiz.questions.map((_, index) => {
-          const isAnsweredQuestion = selectedAnswers.hasOwnProperty(quiz.questions[index]._id);
-          const isCurrent = index === currentQuestionIndex;
-
-          return (
-            <button
-              key={index}
-              onClick={() => setCurrentQuestionIndex(index)}
-              disabled={submitting}
-              className={`w-8 h-8 rounded-lg font-semibold text-xs transition-all duration-200 ${
-                isCurrent
-                  ? 'bg-linear-to-r from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/25 scale-110'
-                  : isAnsweredQuestion
-                  ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  } 
-                  disabled:opacity-50 disabled:cursor-not-allowed
-              `}
-            >
-              {index + 1}
-            </button>
-          );
-        })}
       </div>
 
     </div>
