@@ -4,6 +4,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { register, selectAuthLoading } from '../../store/slices/authSlice';
 import { isPasswordValid } from '../../utils/passwordValidation';
 import PasswordChecklist from '../../components/auth/PasswordChecklist';
+import ThemedSelect from '../../components/common/ThemedSelect';
 import { BrainCircuit, Mail, Lock, ArrowRight, User, Calendar, Briefcase } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -27,7 +28,7 @@ const OCCUPATION_OPTIONS = [
   'Business / Finance',
   'Designer / Creative',
   'Other',
-];
+].map((label) => ({ value: label, label }));
 
 const inputClass =
   'w-full h-12 pl-12 pr-4 border-2 border-slate-200 rounded-xl bg-slate-50/50 text-slate-900 placeholder-slate-400 text-sm font-medium transition-all duration-200 focus:outline-none focus:border-emerald-500 focus:bg-white focus:shadow-lg focus:shadow-emerald-500/10';
@@ -53,6 +54,11 @@ const RegisterPage = () => {
   const setField = (name) => (e) =>
     setForm((prev) => ({ ...prev, [name]: e.target.value }));
 
+  // react-select hands back the whole { value, label } option (or null on
+  // clear) rather than a change event, so it gets its own setter.
+  const setSelectField = (name) => (option) =>
+    setForm((prev) => ({ ...prev, [name]: option?.value || '' }));
+
   const passwordValid = useMemo(() => isPasswordValid(form.password), [form.password]);
   const passwordsMatch =
     form.confirmPassword.length > 0 && form.password === form.confirmPassword;
@@ -60,6 +66,10 @@ const RegisterPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    if (!form.ageRange || !form.occupation) {
+      setError('Please select your age range and occupation.');
+      return;
+    }
     if (!passwordValid) {
       setError('Please meet all password requirements below.');
       return;
@@ -156,54 +166,32 @@ const RegisterPage = () => {
               <label htmlFor="ageRange" className="block text-sm font-medium text-slate-700 mb-1">
                 Age range
               </label>
-              <div className="relative">
-                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
-                <select
-                  id="ageRange"
-                  value={form.ageRange}
-                  onChange={setField('ageRange')}
-                  required
-                  className={`${inputClass} appearance-none cursor-pointer ${
-                    form.ageRange ? 'text-slate-900' : 'text-slate-400'
-                  }`}
-                >
-                  <option value="" disabled>
-                    Select your age range
-                  </option>
-                  {AGE_RANGE_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value} className="text-slate-900">
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <ThemedSelect
+                inputId="ageRange"
+                icon={Calendar}
+                options={AGE_RANGE_OPTIONS}
+                value={AGE_RANGE_OPTIONS.find((opt) => opt.value === form.ageRange) || null}
+                onChange={setSelectField('ageRange')}
+                placeholder="Select your age range"
+                isSearchable={false}
+                invalid={!form.ageRange && Boolean(error)}
+              />
             </div>
 
             <div>
               <label htmlFor="occupation" className="block text-sm font-medium text-slate-700 mb-1">
                 Occupation
               </label>
-              <div className="relative">
-                <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
-                <select
-                  id="occupation"
-                  value={form.occupation}
-                  onChange={setField('occupation')}
-                  required
-                  className={`${inputClass} appearance-none cursor-pointer ${
-                    form.occupation ? 'text-slate-900' : 'text-slate-400'
-                  }`}
-                >
-                  <option value="" disabled>
-                    Select your occupation
-                  </option>
-                  {OCCUPATION_OPTIONS.map((opt) => (
-                    <option key={opt} value={opt} className="text-slate-900">
-                      {opt}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <ThemedSelect
+                inputId="occupation"
+                icon={Briefcase}
+                options={OCCUPATION_OPTIONS}
+                value={OCCUPATION_OPTIONS.find((opt) => opt.value === form.occupation) || null}
+                onChange={setSelectField('occupation')}
+                placeholder="Select your occupation"
+                isSearchable={false}
+                invalid={!form.occupation && Boolean(error)}
+              />
             </div>
 
             <div>

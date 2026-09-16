@@ -20,6 +20,8 @@ const Sidebar = ({ isSidebarOpen, toggleSidebar }) => {
   const handleLogout = async () => {
     // The thunk clears local state even if the server call fails, so this
     // always resolves and the redirect always happens.
+    const getConfirm= confirm('Are you sure you want to logout?')
+    if(!getConfirm){return}
     await dispatch(logout());
     navigate("/login", { replace: true });
   };
