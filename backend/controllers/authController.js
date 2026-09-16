@@ -34,7 +34,7 @@ function setAuthCookies(res, token, user) {
     res.cookie("token", token, {
         httpOnly: true,
         secure: isProd,
-        sameSite: "lax",
+        sameSite: "none",
         maxAge: COOKIE_MAX_AGE,
     });
 
@@ -43,7 +43,7 @@ function setAuthCookies(res, token, user) {
     res.cookie("user_info", JSON.stringify(publicUser(user)), {
         httpOnly: false,
         secure: isProd,
-        sameSite: "lax",
+        sameSite: "none",
         maxAge: COOKIE_MAX_AGE,
     });
 }
@@ -268,7 +268,7 @@ export const updateProfile = async (req, res, next) => {
         res.cookie("user_info", JSON.stringify(publicUser(updatedUser)), {
             httpOnly: false,
             secure: process.env.NODE_ENV === "production",
-            sameSite: "lax",
+            sameSite: "none",
             maxAge: COOKIE_MAX_AGE,
         });
 
