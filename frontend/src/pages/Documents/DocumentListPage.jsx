@@ -6,11 +6,14 @@ import documentService from "../../services/documentService";
 import Spinner from "../../components/common/Spinner";
 import Button from "../../components/common/Button";
 import DocumentCard from "../../components/documents/DocumentCard";
+import Pagination from "../../components/common/Pagination";
 
 const DocumentListPage = () => {
 
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [pagination, setPagination] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
   // State for upload modal
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
@@ -23,10 +26,11 @@ const DocumentListPage = () => {
   const [deleting, setDeleting] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState(null);
 
-  const fetchDocuments = async () => {
+  const fetchDocuments = async (page = currentPage) => {
     try {
-      const data = await documentService.getDocuments();
-      setDocuments(data);
+      const response = await documentService.getDocuments(page);
+      setDocuments(response?.data || []);
+      setPagination(response?.pagination || null);
     } catch (error) {
       toast.error("Failed to fetch documents.");
       console.error(error);
@@ -36,8 +40,15 @@ const DocumentListPage = () => {
   };
 
   useEffect(() => {
-    fetchDocuments();
-  }, []);
+    setLoading(true);
+    fetchDocuments(currentPage);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage]);
+
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
@@ -65,7 +76,11 @@ const DocumentListPage = () => {
       setUploadFile(null);
       setUploadTitle("");
       setLoading(true);
-      fetchDocuments();
+      if (currentPage === 1) {
+        fetchDocuments(1);
+      } else {
+        setCurrentPage(1);
+      }
     } catch (error) {
       toast.error(error.message || "Upload failed.");
     } finally {
@@ -86,7 +101,11 @@ const DocumentListPage = () => {
       toast.success(`'${selectedDoc?.title}' deleted.`);
       setIsDeleteModalOpen(false);
       setSelectedDoc(null);
-      setDocuments(documents.filter((d) => d._id !== selectedDoc?._id));
+      if (documents.length === 1 && currentPage > 1) {
+        setCurrentPage(currentPage - 1);
+      } else {
+        fetchDocuments(currentPage);
+      }
     } catch (error) {
       toast.error(error.message || "Failed to delete document.");
     } finally {
@@ -165,6 +184,14 @@ const DocumentListPage = () => {
       </div>
 
       {renderContent()}
+
+      {!loading && documents.length > 0 && (
+        <Pagination
+          pagination={pagination}
+          onPageChange={handlePageChange}
+          className="mt-10"
+        />
+      )}
     </div>
 
     {isUploadModalOpen && <div className="fixed inset-0 z-50 flex items-center  justify-center p-4 bg-slate-900/50 backdrop-blur-sm">

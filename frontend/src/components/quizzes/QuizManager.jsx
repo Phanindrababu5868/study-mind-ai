@@ -9,6 +9,7 @@ import Button from '../common/Button';
 import Modal from '../common/Modal';
 import QuizCard from './QuizCard';
 import EmptyState from '../common/EmptyState';
+import Pagination from '../common/Pagination';
 
 const QuizManager = ({documentId}) => {
 
@@ -17,16 +18,19 @@ const QuizManager = ({documentId}) => {
   const [generating, setGenerating] = useState(false);
   const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false);
   const [numQuestions, setNumQuestions] = useState(5);
+  const [pagination, setPagination] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [selectedQuiz, setSelectedQuiz] = useState(null);
 
-  const fetchQuizzes = async () => {
+  const fetchQuizzes = async (page = currentPage) => {
     setLoading(true);
     try {
-      const data = await quizService.getQuizzesForDocument(documentId);
+      const data = await quizService.getQuizzesForDocument(documentId, page);
       setQuizzes(data.data);
+      setPagination(data.pagination);
     } catch (error) {
       toast.error('Failed to fetch quizzes.');
       console.error(error);
@@ -37,9 +41,14 @@ const QuizManager = ({documentId}) => {
 
   useEffect(() => {
     if (documentId) {
-      fetchQuizzes();
+      fetchQuizzes(currentPage);
     }
-  }, [documentId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [documentId, currentPage]);
+
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+  };
 
   const handleGenerateQuiz = async (e) => {
     e.preventDefault();
@@ -48,7 +57,11 @@ const QuizManager = ({documentId}) => {
       await aiService.generateQuiz(documentId, { numQuestions });
       toast.success('Quiz generated successfully!');
       setIsGenerateModalOpen(false);
-      fetchQuizzes();
+      if (currentPage === 1) {
+        fetchQuizzes(1);
+      } else {
+        setCurrentPage(1);
+      }
     } catch (error) {
       toast.error(error.message || 'Failed to generate quiz.');
     } finally {
@@ -69,7 +82,11 @@ const QuizManager = ({documentId}) => {
         toast.success(`'${selectedQuiz.title || 'Quiz'}' deleted.`);
         setIsDeleteModalOpen(false);
         setSelectedQuiz(null);
-        setQuizzes(quizzes.filter(q => q._id !== selectedQuiz._id));
+        if (quizzes.length === 1 && currentPage > 1) {
+          setCurrentPage(currentPage - 1);
+        } else {
+          fetchQuizzes(currentPage);
+        }
     } catch (error) {
         toast.error(error.message || 'Failed to delete quiz.');
     } finally {
@@ -109,6 +126,14 @@ const QuizManager = ({documentId}) => {
       </div>
 
       {renderQuizContent()}
+
+      {!loading && quizzes.length > 0 && (
+        <Pagination
+          pagination={pagination}
+          onPageChange={handlePageChange}
+          className="mt-6"
+        />
+      )}
 
       {/* Generate Quiz */}
       <Modal

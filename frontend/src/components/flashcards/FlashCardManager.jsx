@@ -16,6 +16,7 @@ import aiService from "../../services/aiService";
 import Spinner from "../common/Spinner";
 import Modal from "../common/Modal";
 import Flashcard from "./Flashcard";
+import Pagination from "../common/Pagination";
 
 const FlashcardManager = ({documentId}) => {
 
@@ -27,14 +28,18 @@ const FlashcardManager = ({documentId}) => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [setToDelete, setSetToDelete] = useState(null);
+  const [pagination, setPagination] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
-  const fetchFlashcardSets = async () => {
+  const fetchFlashcardSets = async (page = currentPage) => {
     setLoading(true);
     try {
       const response = await flashcardService.getFlashcardsForDocument(
-        documentId
+        documentId,
+        page
       );
       setFlashcardSets(response.data);
+      setPagination(response.pagination);
     } catch (error) {
       toast.error("Failed to fetch flashcard sets.");
       console.error(error);
@@ -45,16 +50,25 @@ const FlashcardManager = ({documentId}) => {
 
   useEffect(() => {
     if (documentId) {
-      fetchFlashcardSets();
+      fetchFlashcardSets(currentPage);
     }
-  }, [documentId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [documentId, currentPage]);
+
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+  };
 
   const handleGenerateFlashcards = async () => {
     setGenerating(true);
     try {
       await aiService.generateFlashcards(documentId);
       toast.success("Flashcards generated successfully!");
-      fetchFlashcardSets();
+      if (currentPage === 1) {
+        fetchFlashcardSets(1);
+      } else {
+        setCurrentPage(1);
+      }
     } catch (error) {
       toast.error(error.message || "Failed to generate flashcards.");
     } finally {
@@ -127,7 +141,11 @@ const FlashcardManager = ({documentId}) => {
       toast.success("Flashcard set deleted successfully!");
       setIsDeleteModalOpen(false);
       setSetToDelete(null);
-      fetchFlashcardSets();
+      if (flashcardSets.length === 1 && currentPage > 1) {
+        setCurrentPage(currentPage - 1);
+      } else {
+        fetchFlashcardSets(currentPage);
+      }
     } catch (error) {
       toast.error(error.message || "Failed to delete flashcard set.");
     } finally {
@@ -323,6 +341,12 @@ const renderSetList = () => {
             </div>
           ))}
         </div>
+
+        <Pagination
+          pagination={pagination}
+          onPageChange={handlePageChange}
+          className="pt-2"
+        />
       </div>
     );
   
