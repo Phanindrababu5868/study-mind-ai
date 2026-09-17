@@ -112,6 +112,8 @@ const QuizTakePage = () => {
   const currentQuestion = quiz.questions[currentQuestionIndex];
   const answeredCount = Object.keys(selectedAnswers).length;
   const isLastQuestion = currentQuestionIndex === quiz.questions.length - 1;
+  const isCurrentQuestionAnswered =
+  selectedAnswers[currentQuestion._id] !== undefined;
 
     return (
     <div className="max-w-4xl mx-auto">
@@ -230,7 +232,7 @@ const QuizTakePage = () => {
           {isLastQuestion ? (
             <button
               onClick={handleSubmitQuiz}
-              disabled={submitting}
+              disabled={!isCurrentQuestionAnswered || submitting}
               className="group relative px-8 h-12 bg-linear-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-semibold text-sm rounded-xl transition-all duration-200 shadow-lg shadow-emerald-500/25 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 overflow-hidden"
             >
               <span className="relative z-10 flex items-center justify-center gap-2">
@@ -251,7 +253,7 @@ const QuizTakePage = () => {
           ) : (
             <Button
               onClick={handleNextQuestion}
-              disabled={submitting}
+              disabled={!isCurrentQuestionAnswered || submitting}
             >
               Next
               <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform duration-700" strokeWidth={2.5} />
