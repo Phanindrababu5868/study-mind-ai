@@ -1,17 +1,15 @@
-import fs from "fs/promises";
 import { PDFParse } from "pdf-parse";
 
 /**
- * Extract text from PDF file
- * @param {string} filePath - Path to PDF file
- * @returns {Promise<{text: string, numPages: number}>}
+ * Extract text from a PDF held in memory (e.g. multer's req.file.buffer,
+ * or a buffer downloaded from R2) — no filesystem access required.
+ * @param {Buffer} buffer - Raw PDF bytes
+ * @returns {Promise<{text: string, numPages: number, info: object}>}
  */
-export const extractTextFromPDF = async (filePath) => {
+export const extractTextFromPDF = async (buffer) => {
   try {
-    const dataBuffer = await fs.readFile(filePath);
-
     // pdf-parse expects a Uint8Array, not a Buffer
-    const parser = new PDFParse(new Uint8Array(dataBuffer));
+    const parser = new PDFParse(new Uint8Array(buffer));
 
     const data = await parser.getText();
 

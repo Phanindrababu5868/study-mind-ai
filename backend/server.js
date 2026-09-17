@@ -1,11 +1,10 @@
-import dotenv from 'dotenv'
-dotenv.config()
+// import dotenv from 'dotenv'
+// dotenv.config()
+import 'dotenv/config';
 
 import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
-import path from 'path' ;
-import {fileURLToPath} from 'url'
 import connectDB from './config/db.js'
 import errorHandler from './middleware/errorHandler.js'
 
@@ -16,11 +15,6 @@ import aiRoutes from './routes/aiRoutes.js'
 import quizRoutes from './routes/quizRoutes.js'
 import progressRoutes from './routes/progressRoutes.js'
 import { apiLimiter } from './middleware/rateLimiter.js'
-
-//ES6 modile__dirname  altername
-
-const __filename= fileURLToPath(import.meta.url)
-const __dirname=path.dirname(__filename)
 
 // initialize express app
 
@@ -44,10 +38,6 @@ app.use(cors({
 app.use(express.json())
 app.use(express.urlencoded({extended:true}))
 app.use(cookieParser())
-
-// static folder for upload
-
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 
 // Routes

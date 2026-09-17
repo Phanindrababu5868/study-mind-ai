@@ -34,29 +34,18 @@ const DocumentDetailPage = () => {
     fetchDocumentDetails();
   }, [id]);
 
-  // Helper function to get the full PDF URL
-  const getPdfUrl = () => {
-    if (!document?.data?.filePath) return null;
-
-    const filePath = document.data.filePath;
-
-    if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
-      return filePath;
-    }
-
-    const baseUrl = process.env.REACT_APP_API_URL || 'http://localhost:8000';
-    return `${baseUrl}${filePath.startsWith('/') ? '' : '/'}${filePath}`;
-  };
+  // The backend now returns a ready-to-use, short-lived signed R2 URL in
+  // `fileUrl` — it never sends the raw object key (`filePath`) to the
+  // client, so there's nothing to build here anymore.
+  const pdfUrl = document?.data?.fileUrl || null;
 
   const renderContent = () => {
     if (loading) {
       return <Spinner />;
     }
-    if (!document || !document.data || !document.data.filePath) {
+    if (!pdfUrl) {
       return <div className="text-center p-8">PDF not available.</div>;
     }
-
-    const pdfUrl = getPdfUrl();
 
     return (
       <div className="bg-white border border-gray-300 rounded-lg overflow-hidden shadow-sm">

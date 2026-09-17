@@ -3,9 +3,14 @@ import Flashcard from '../models/Flashcard.js';
 import Quiz from '../models/Quiz.js';
 import { extractTextFromPDF } from '../utils/pdfParser.js';
 import { chunkText } from '../utils/textChunker.js';
-import fs from 'fs/promises';
 import mongoose from 'mongoose';
 import { getPagination, buildPaginationMeta } from '../utils/pagination.js';
+import {
+  buildDocumentKey,
+  uploadBufferToR2,
+  deleteObjectFromR2,
+  getSignedDownloadUrl,
+} from '../utils/storageService.js';
 
 // @desc    Upload PDF document
 // @route   POST /api/documents/upload
@@ -23,7 +28,6 @@ export const uploadDocument = async (req, res, next) => {
     const {title} =req.body 
 
     if (!title) {
-        await fs.unlink(req.file.path)
       return res.status(400).json({
         success: false,
         message: "Please provide a document title",
@@ -31,22 +35,24 @@ export const uploadDocument = async (req, res, next) => {
       });
     }
 
-    // Construct the URL for the uploaded file
-    const baseUrl = process.env.API_BASE_URL;
-    const fileUrl = `${baseUrl}/uploads/documents/${req.file.filename}`;
+    // Upload the buffer (never touches this server's disk) straight to R2
+    const objectKey = buildDocumentKey(req.user._id, req.file.originalname);
+    await uploadBufferToR2(req.file.buffer, objectKey, req.file.mimetype);
 
-    // Create document record
+    // Create document record — filePath stores the R2 object key, not a
+    // public URL. Access is only ever granted via a short-lived signed URL
+    // generated after an ownership check (see getDocument below).
     const document = await Document.create({
     userId: req.user._id,
     title: req.file.originalname,
     fileName: req.file.originalname,
-    filePath: fileUrl, // Store the URL instead of the local path
+    filePath: objectKey,
     fileSize: req.file.size,
     status: 'processing'
     });
 
     // Process PDF in background (in production, use a queue like Bull)
-    processPDF(document._id, req.file.path).catch(err => {
+    processPDF(document._id, req.file.buffer).catch(err => {
     console.error('PDF processing error:', err);
     });
 
@@ -57,18 +63,14 @@ export const uploadDocument = async (req, res, next) => {
     })
 
   } catch (error) {
-    // Clean up file on error
-    if (req.file) {
-      await fs.unlink(req.file.path).catch(() => {});
-    }
     next(error);
   }
 };
 
 // Helper function to process PDF
-const processPDF = async (documentId, filePath) => {
+const processPDF = async (documentId, buffer) => {
   try {
-    const { text } = await extractTextFromPDF(filePath);
+    const { text } = await extractTextFromPDF(buffer);
 
     // Create chunks
     const chunks = chunkText(text, 500, 50);
@@ -196,6 +198,11 @@ export const getDocument = async (req, res, next) => {
     documentData.flashCardCount=flashCardCount
     documentData.quizzesCount=quizzesCount
 
+    // Ownership was already verified in the query above — only now do we
+    // mint a signed URL, and it expires in 5 minutes.
+    documentData.fileUrl = await getSignedDownloadUrl(document.filePath);
+    delete documentData.filePath; // internal R2 key, never expose it directly
+
     return res.status(200).json({
       success: true,
       data:documentData,
@@ -233,8 +240,8 @@ export const deleteDocument = async (req, res, next) => {
       });
     }
 
-    // Remove the physical file from disk
-    await fs.unlink(document.filePath).catch(() => {});
+    // Remove the object from R2
+    await deleteObjectFromR2(document.filePath).catch(() => {});
 
     // Remove related flashcards and quizzes tied to this document
     await Flashcard.deleteMany({ documentId: document._id });
