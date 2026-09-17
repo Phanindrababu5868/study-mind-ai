@@ -5,6 +5,7 @@ import { extractTextFromPDF } from '../utils/pdfParser.js';
 import { chunkText } from '../utils/textChunker.js';
 import fs from 'fs/promises';
 import mongoose from 'mongoose';
+import { getPagination, buildPaginationMeta } from '../utils/pagination.js';
 
 // @desc    Upload PDF document
 // @route   POST /api/documents/upload
@@ -94,7 +95,8 @@ const processPDF = async (documentId, filePath) => {
 // @access  Private
 export const getDocuments = async (req, res, next) => {
   try {
-    const documents = await Document.aggregate(
+    const { page, limit, skip } = getPagination(req);
+   const [result] = await Document.aggregate(
         [
             {
         $match: {
@@ -130,13 +132,23 @@ export const getDocuments = async (req, res, next) => {
             flashcardSets: 0,
             quizzes: 0}
         },
+    { $sort: { uploadDate: -1 } },
     {
-        $sort: { uploadDate: -1 }
+        // $facet runs both branches against the same post-match, post-sort
+        // pipeline in one round trip: `data` for the current page, `totalCount`
+        // for the total match count the page count is computed from.
+        $facet: {
+            data: [{ $skip: skip }, { $limit: limit }],
+            totalCount: [{ $count: 'count' }],
+        }
     }])
-     
+
+    const documents = result?.data || [];
+    const total = result?.totalCount?.[0]?.count || 0;
     res.status(200).json(
         {success: true,
         count: documents.length,
+        pagination: buildPaginationMeta(page, limit, total),
         data:documents
     })
   } catch (error) {

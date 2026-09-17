@@ -1,26 +1,37 @@
 import Quiz from '../models/Quiz.js';
+import { getPagination, buildPaginationMeta } from '../utils/pagination.js';
+
 
 // @desc    Get all quizzes for a document
 // @route   GET /api/quizzes/:documentId
 // @access  Private
-export const getQuizzes = async (req, res, next) => {
-  try {
-    const quizzes = await Quiz.find({
-      userId: req.user._id,
-      documentId: req.params.documentId
-    })
-      .populate('documentId', 'title fileName')
-      .sort({ createdAt: -1 });
+ export const getQuizzes = async (req, res, next) => {
+   try {
+    const { page, limit, skip } = getPagination(req);
+    const filter = {
+       userId: req.user._id,
+       documentId: req.params.documentId
+    };
 
-    res.status(200).json({
-      success: true,
-      count: quizzes.length,
-      data: quizzes
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+    const [quizzes, total] = await Promise.all([
+      Quiz.find(filter)
+        .populate('documentId', 'title fileName')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      Quiz.countDocuments(filter),
+    ]);
+
+     res.status(200).json({
+       success: true,
+       count: quizzes.length,
+      pagination: buildPaginationMeta(page, limit, total),
+       data: quizzes
+     });
+   } catch (error) {
+     next(error);
+   }
+ };
 
 // @desc    Get a single quiz by ID
 // @route   GET /api/quizzes/quiz/:id

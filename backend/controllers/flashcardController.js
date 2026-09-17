@@ -1,45 +1,66 @@
 import Flashcard from '../models/Flashcard.js';
+import { getPagination, buildPaginationMeta } from '../utils/pagination.js';
 
 // @desc    Get all flashcards for a document
 // @route   GET /api/flashcards/:documentId
 // @access  Private
 export const getFlashcards = async (req, res, next) => {
-  try {
-    const flashcards = await Flashcard.find({
-      userId: req.user._id,
-      documentId: req.params.documentId
-    })
-      .populate('documentId', 'title fileName')
-      .sort({ createdAt: -1 });
+   try {
+   const { page, limit, skip } = getPagination(req);
+    const filter = {
+       userId: req.user._id,
+       documentId: req.params.documentId
+   }
 
-    res.status(200).json({
-      success: true,
-      count: flashcards.length,
-      data: flashcards
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+    const [flashcards, total] = await Promise.all([
+      Flashcard.find(filter)
+        .populate('documentId', 'title fileName')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      Flashcard.countDocuments(filter),
+    ]);
+
+     res.status(200).json({
+       success: true,
+       count: flashcards.length,
+      pagination: buildPaginationMeta(page, limit, total),
+       data: flashcards
+     });
+   } catch (error) {
+     next(error);
+   }
+ };
+
 
 // @desc    Get all flashcard sets for a user
 // @route   GET /api/flashcards
 // @access  Private
 export const getAllFlashcardSets = async (req, res, next) => {
-  try {
-    const flashcardSets = await Flashcard.find({ userId: req.user._id })
-      .populate('documentId', 'title')
-      .sort({ createdAt: -1 });
+   try {
 
-    res.status(200).json({
-      success: true,
-      count: flashcardSets.length,
-      data: flashcardSets,
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+    const { page, limit, skip } = getPagination(req);
+    const filter = { userId: req.user._id };
+
+    const [flashcardSets, total] = await Promise.all([
+      Flashcard.find(filter)
+        .populate('documentId', 'title')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+       .limit(limit),
+      Flashcard.countDocuments(filter),
+    ]);
+
+     res.status(200).json({
+       success: true,
+       count: flashcardSets.length,
+      pagination: buildPaginationMeta(page, limit, total),
+       data: flashcardSets,
+     });
+   } catch (error) {
+     next(error);
+   }
+ };
 
 
 

@@ -9,7 +9,7 @@ import {
     changePassword
 } from '../controllers/authController.js'
 import { AGE_RANGES } from '../models/User.js'
-
+import { authLimiter } from '../middleware/rateLimiter.js'
 import protect from '../middleware/auth.js'
 
 const router=express.Router()
@@ -78,8 +78,8 @@ const loginValidation = [
 ];
 
 // Public routes
-router.post('/register', registerValidation, runValidation, register);
-router.post('/login', loginValidation, runValidation, login);
+router.post('/register',authLimiter, registerValidation, runValidation, register);
+router.post('/login',authLimiter, loginValidation, runValidation, login);
 router.post('/logout', logout);
 
 // Protected routes

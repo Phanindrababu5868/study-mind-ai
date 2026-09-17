@@ -15,6 +15,7 @@ import flashCardRoutes from './routes/flashCardRoutes.js'
 import aiRoutes from './routes/aiRoutes.js'
 import quizRoutes from './routes/quizRoutes.js'
 import progressRoutes from './routes/progressRoutes.js'
+import { apiLimiter } from './middleware/rateLimiter.js'
 
 //ES6 modile__dirname  altername
 
@@ -50,7 +51,7 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 
 // Routes
-
+app.use('/api', apiLimiter)
 app.use('/api/auth',authRoutes)
 app.use('/api/documents',documentRouets)
 app.use('/api/flashcards',flashCardRoutes)
