@@ -132,7 +132,6 @@ export const register = async (req, res, next) => {
             success: true,
             message: "User registered successfully",
             user: publicUser(user),
-            token,
         });
     } catch (error) {
         next(error);
@@ -187,7 +186,6 @@ export const login = async (req, res, next) => {
             success: true,
             message: "Login successful",
             user: publicUser(user),
-            token,
         });
     } catch (error) {
         next(error);

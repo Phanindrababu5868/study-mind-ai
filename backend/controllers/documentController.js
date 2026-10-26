@@ -11,6 +11,7 @@ import {
   uploadBufferToR2,
   deleteObjectFromR2,
   getSignedDownloadUrl,
+  downloadBufferFromR2,
 } from '../utils/storageService.js';
 
 // @desc    Upload PDF document
@@ -90,6 +91,26 @@ const processPDF = async (documentId, buffer) => {
     await Document.findByIdAndUpdate(documentId, {
       status: 'failed'
     });
+  }
+};
+
+// Processing runs in-process, so a restart mid-way leaves documents stuck in
+// 'processing' forever. Called once on startup: re-download each stuck PDF
+// from R2 and process it again (one at a time, to keep memory use flat).
+export const recoverStuckDocuments = async () => {
+  const stuck = await Document.find({ status: 'processing' }).select('_id filePath');
+  if (!stuck.length) return;
+
+  console.log(`Recovering ${stuck.length} document(s) stuck in processing`);
+
+  for (const doc of stuck) {
+    try {
+      const buffer = await downloadBufferFromR2(doc.filePath);
+      await processPDF(doc._id, buffer);
+    } catch (error) {
+      console.error(`Could not recover document ${doc._id}:`, error.message);
+      await Document.findByIdAndUpdate(doc._id, { status: 'failed' });
+    }
   }
 };
 
