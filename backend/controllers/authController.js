@@ -292,7 +292,7 @@ export const updateProfile = async (req, res, next) => {
 
 // ============================================================
 // @desc    Change password
-// @route   PUT /api/auth/change-password
+// @route   POST /api/auth/change-password
 // @access  Private
 // ============================================================
 export const changePassword = async (req, res, next) => {
@@ -345,6 +345,10 @@ export const changePassword = async (req, res, next) => {
 
         // Password should be hashed by User schema pre("save") middleware
         await user.save();
+
+        // Saving set passwordChangedAt, which invalidates every existing token
+        // — including this one. Issue a fresh one so this session stays logged in.
+        setAuthCookies(res, generateToken(user._id), user);
 
         return res.status(200).json({
             success: true,

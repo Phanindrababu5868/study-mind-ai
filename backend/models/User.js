@@ -63,6 +63,13 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+
+    // Tokens issued before this moment are rejected by the auth middleware,
+    // so changing the password logs out every other session.
+    passwordChangedAt: {
+      type: Date,
+      default: null,
+    },
   },
   {
     timestamps: true,
@@ -74,6 +81,13 @@ userSchema.pre("save", async function () {
   // Don't hash if password hasn't changed
   if (!this.isModified("password")) {
     return
+  }
+
+  // Not on sign-up — only when an existing user changes their password.
+  // Backdated 1s because JWT `iat` is in whole seconds: the new token issued
+  // right after this save must not count as "older" than the change.
+  if (!this.isNew) {
+    this.passwordChangedAt = new Date(Date.now() - 1000);
   }
 
   // Generate salt

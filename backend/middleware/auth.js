@@ -38,6 +38,15 @@ const protect = async (req, res, next) => {
             });
         }
 
+        // Token was issued before the last password change → no longer valid
+        if (user.passwordChangedAt && decoded.iat * 1000 < user.passwordChangedAt.getTime()) {
+            return res.status(401).json({
+                success: false,
+                message: "Password was changed recently, please log in again",
+                statusCode: 401,
+            });
+        }
+
         req.user = user;
         next();
     } catch (error) {
