@@ -1,6 +1,7 @@
 import Document from '../models/Document.js';
 import Flashcard from '../models/Flashcard.js';
 import Quiz from '../models/Quiz.js';
+import ChatHistory from '../models/ChatHistory.js';
 import { extractTextFromPDF } from '../utils/pdfParser.js';
 import { chunkText } from '../utils/textChunker.js';
 import mongoose from 'mongoose';
@@ -27,7 +28,7 @@ export const uploadDocument = async (req, res, next) => {
 
     const {title} =req.body 
 
-    if (!title) {
+    if (!title || !title.trim()) {
       return res.status(400).json({
         success: false,
         message: "Please provide a document title",
@@ -44,7 +45,7 @@ export const uploadDocument = async (req, res, next) => {
     // generated after an ownership check (see getDocument below).
     const document = await Document.create({
     userId: req.user._id,
-    title: req.file.originalname,
+    title: title.trim(),
     fileName: req.file.originalname,
     filePath: objectKey,
     fileSize: req.file.size,
@@ -243,9 +244,10 @@ export const deleteDocument = async (req, res, next) => {
     // Remove the object from R2
     await deleteObjectFromR2(document.filePath).catch(() => {});
 
-    // Remove related flashcards and quizzes tied to this document
+    // Remove related flashcards, quizzes and chat history tied to this document
     await Flashcard.deleteMany({ documentId: document._id });
     await Quiz.deleteMany({ documentId: document._id });
+    await ChatHistory.deleteMany({ documentId: document._id });
 
     await document.deleteOne();
 

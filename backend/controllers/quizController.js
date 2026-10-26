@@ -14,7 +14,9 @@ import { getPagination, buildPaginationMeta } from '../utils/pagination.js';
     };
 
     const [quizzes, total] = await Promise.all([
+      // Answers stay server-side in list views; results come from /:id/results
       Quiz.find(filter)
+        .select('-questions.correctAnswer -questions.explanation')
         .populate('documentId', 'title fileName')
         .sort({ createdAt: -1 })
         .skip(skip)
@@ -51,9 +53,17 @@ export const getQuizById = async (req, res, next) => {
       });
     }
 
+    // Don't leak answers while the quiz is still being taken
+    const quizData = quiz.toObject();
+    if (!quiz.completedAt) {
+      quizData.questions = quizData.questions.map(
+        ({ correctAnswer, explanation, ...rest }) => rest
+      );
+    }
+
     res.status(200).json({
       success: true,
-      data: quiz
+      data: quizData
     });
   } catch (error) {
     next(error);
@@ -100,10 +110,21 @@ export const submitQuiz = async (req, res, next) => {
     let correctCount = 0;
     const userAnswers = [];
 
-    answers.forEach(answer => {
-      const { questionIndex, selectedAnswer } = answer;
+    // Only count valid, first-seen question indexes so a crafted payload
+    // can't crash the handler or push the score past 100%.
+    const seen = new Set();
 
-      if (questionIndex < quiz.questions.length) {
+    answers.forEach(answer => {
+      const { questionIndex, selectedAnswer } = answer || {};
+
+      if (
+        Number.isInteger(questionIndex) &&
+        questionIndex >= 0 &&
+        questionIndex < quiz.questions.length &&
+        typeof selectedAnswer === 'string' &&
+        !seen.has(questionIndex)
+      ) {
+        seen.add(questionIndex);
         const question = quiz.questions[questionIndex];
         const isCorrect = selectedAnswer === question.correctAnswer;
 

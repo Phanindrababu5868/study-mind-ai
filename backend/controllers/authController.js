@@ -26,31 +26,46 @@ const publicUser = (user) => ({
     createdAt: user.createdAt,
 });
 
-function setAuthCookies(res, token, user) {
+// Chrome rejects SameSite=None cookies that aren't also Secure, and Secure
+// cookies need HTTPS. In dev, localhost:5173 -> localhost:8000 is same-site
+// (ports don't matter), so "lax" works over plain http. In production the
+// frontend and API are typically on different sites, which needs None+Secure.
+const cookieOptions = () => {
     const isProd = process.env.NODE_ENV === "production";
-
-    // httpOnly: JS on the frontend can never read this, only the browser
-    // sends it back automatically on same-site requests.
-    res.cookie("token", token, {
-        httpOnly: true,
+    return {
         secure: isProd,
-        sameSite: "none",
-        maxAge: COOKIE_MAX_AGE,
-    });
+        sameSite: isProd ? "none" : "lax",
+        path: "/",
+    };
+};
 
+function setUserInfoCookie(res, user) {
     // Readable by the frontend so Redux can hydrate instantly on first paint
     // without waiting on a /profile round trip. Never put the token in here.
     res.cookie("user_info", JSON.stringify(publicUser(user)), {
+        ...cookieOptions(),
         httpOnly: false,
-        secure: isProd,
-        sameSite: "none",
         maxAge: COOKIE_MAX_AGE,
     });
 }
 
+function setAuthCookies(res, token, user) {
+    // httpOnly: JS on the frontend can never read this, only the browser
+    // sends it back automatically on same-site requests.
+    res.cookie("token", token, {
+        ...cookieOptions(),
+        httpOnly: true,
+        maxAge: COOKIE_MAX_AGE,
+    });
+
+    setUserInfoCookie(res, user);
+}
+
+// Browsers only clear a cookie when the attributes match the ones it was
+// set with, so reuse the same options here.
 function clearAuthCookies(res) {
-    res.clearCookie("token");
-    res.clearCookie("user_info");
+    res.clearCookie("token", { ...cookieOptions(), httpOnly: true });
+    res.clearCookie("user_info", cookieOptions());
 }
 
 // ============================================================
@@ -265,12 +280,7 @@ export const updateProfile = async (req, res, next) => {
 
         // The readable user_info cookie is a cached copy — keep it in sync
         // whenever the underlying profile changes.
-        res.cookie("user_info", JSON.stringify(publicUser(updatedUser)), {
-            httpOnly: false,
-            secure: process.env.NODE_ENV === "production",
-            sameSite: "none",
-            maxAge: COOKIE_MAX_AGE,
-        });
+        setUserInfoCookie(res, updatedUser);
 
         return res.status(200).json({
             success: true,
