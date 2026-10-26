@@ -33,3 +33,17 @@ export const authLimiter = rateLimit({
         statusCode: 429,
     },
 });
+
+// AI routes each trigger a paid Gemini call, so they get their own, much
+// lower ceiling on top of the general API limiter.
+export const aiLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000, // 1 hour
+    max: 60,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: {
+        success: false,
+        message: 'AI request limit reached. Please try again later.',
+        statusCode: 429,
+    },
+});

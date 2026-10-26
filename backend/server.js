@@ -15,14 +15,29 @@ import aiRoutes from './routes/aiRoutes.js'
 import quizRoutes from './routes/quizRoutes.js'
 import progressRoutes from './routes/progressRoutes.js'
 import { apiLimiter } from './middleware/rateLimiter.js'
+import { recoverStuckDocuments } from './controllers/documentController.js'
 
 // initialize express app
 
 const app=express()
 
 
-// connect to MongoDB
-connectDB()
+// Behind a reverse proxy / load balancer (Render, Railway, Nginx...) every
+// request arrives from the proxy's IP, so the rate limiters would lump all
+// users together. TRUST_PROXY is the number of proxies in front of the app.
+// Leave it unset locally — trusting X-Forwarded-For without a proxy lets
+// clients spoof their IP and dodge the rate limits.
+const trustProxyHops = parseInt(process.env.TRUST_PROXY, 10)
+if (trustProxyHops > 0) {
+    app.set('trust proxy', trustProxyHops)
+}
+
+// connect to MongoDB, then pick up any PDFs a previous run didn't finish
+connectDB().then(() =>
+    recoverStuckDocuments().catch(err =>
+        console.error('Stuck document recovery failed:', err.message)
+    )
+)
 
 // MiddleWare to handle CROS
 // NOTE: cookies + `credentials: true` require an explicit origin — a

@@ -5,6 +5,15 @@ import ChatHistory from '../models/ChatHistory.js';
 import * as geminiService from '../utils/geminiService.js';
 import { findRelevantChunks } from '../utils/textChunker.js';
 
+// Caps how many items a single generate call can request, so one request
+// can't run up an outsized Gemini bill. Non-numeric input falls back to the default.
+const MAX_GENERATE_COUNT = 30;
+const clampCount = (value, fallback) => {
+  const n = parseInt(value, 10);
+  if (Number.isNaN(n)) return fallback;
+  return Math.min(Math.max(n, 1), MAX_GENERATE_COUNT);
+};
+
 // @desc    Generate flashcards from document
 // @route   POST /api/ai/generate-flashcards
 // @access  Private
@@ -37,7 +46,7 @@ export const generateFlashcards = async (req, res, next) => {
     // Generate flashcards using Gemini
     const cards = await geminiService.generateFlashcards(
       document.extractedText,
-      parseInt(count),
+      clampCount(count, 10),
       req.user
     );
 
@@ -97,7 +106,7 @@ export const generateQuiz = async (req, res, next) => {
     // Generate quiz using Gemini
     const questions = await geminiService.generateQuiz(
       document.extractedText,
-      parseInt(numQuestions),
+      clampCount(numQuestions, 5),
       req.user
     );
 

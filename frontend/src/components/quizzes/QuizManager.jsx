@@ -149,8 +149,9 @@ const QuizManager = ({documentId}) => {
             <input
               type="number"
               value={numQuestions}
-              onChange={(e) => setNumQuestions(Math.max(1, parseInt(e.target.value) || 1))}
+              onChange={(e) => setNumQuestions(Math.min(30, Math.max(1, parseInt(e.target.value) || 1)))}
               min="1"
+              max="30"
               required
               className="w-full h-9 px-3 border border-neutral-200 rounded-lg bg-white text-sm text-neutral-900 placeholder-neutral-400 transition-color duration-150 focus:outline-none focus:ring-2 focus:ring-[#00d492] focus:border-transparent"
             />

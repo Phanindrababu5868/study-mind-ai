@@ -35,6 +35,15 @@ export const deleteObjectFromR2 = async (key) => {
   );
 };
 
+// Downloads an object into memory — used to re-process a PDF whose original
+// upload buffer was lost (e.g. the server restarted mid-processing).
+export const downloadBufferFromR2 = async (key) => {
+  const response = await r2Client.send(
+    new GetObjectCommand({ Bucket: R2_BUCKET, Key: key })
+  );
+  return Buffer.from(await response.Body.transformToByteArray());
+};
+
 // Short-lived signed URL — the caller must already have verified the
 // requesting user owns this document before calling this. Default 5 min
 // is plenty to load/view a PDF; it can be re-requested if it expires.

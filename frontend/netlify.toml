@@ -1,0 +1,20 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+# Forward API calls to the Render backend, so the browser only ever talks to
+# the Netlify domain. That keeps the auth cookie first-party, which Safari/iOS
+# require (they block third-party cookies). Set VITE_BASE_URL to empty on
+# Netlify so the frontend calls /api/... on its own origin.
+[[redirects]]
+  from = "/api/*"
+  to = "https://study-mind-ai.onrender.com/api/:splat"
+  status = 200
+  force = true
+
+# React Router: serve index.html for client-side routes like /dashboard,
+# so refreshing or opening a deep link doesn't 404.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

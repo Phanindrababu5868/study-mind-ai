@@ -1,6 +1,7 @@
 import Document from '../models/Document.js';
 import Flashcard from '../models/Flashcard.js';
 import Quiz from '../models/Quiz.js';
+import ChatHistory from '../models/ChatHistory.js';
 import { extractTextFromPDF } from '../utils/pdfParser.js';
 import { chunkText } from '../utils/textChunker.js';
 import mongoose from 'mongoose';
@@ -10,6 +11,7 @@ import {
   uploadBufferToR2,
   deleteObjectFromR2,
   getSignedDownloadUrl,
+  downloadBufferFromR2,
 } from '../utils/storageService.js';
 
 // @desc    Upload PDF document
@@ -27,7 +29,7 @@ export const uploadDocument = async (req, res, next) => {
 
     const {title} =req.body 
 
-    if (!title) {
+    if (!title || !title.trim()) {
       return res.status(400).json({
         success: false,
         message: "Please provide a document title",
@@ -44,7 +46,7 @@ export const uploadDocument = async (req, res, next) => {
     // generated after an ownership check (see getDocument below).
     const document = await Document.create({
     userId: req.user._id,
-    title: req.file.originalname,
+    title: title.trim(),
     fileName: req.file.originalname,
     filePath: objectKey,
     fileSize: req.file.size,
@@ -89,6 +91,26 @@ const processPDF = async (documentId, buffer) => {
     await Document.findByIdAndUpdate(documentId, {
       status: 'failed'
     });
+  }
+};
+
+// Processing runs in-process, so a restart mid-way leaves documents stuck in
+// 'processing' forever. Called once on startup: re-download each stuck PDF
+// from R2 and process it again (one at a time, to keep memory use flat).
+export const recoverStuckDocuments = async () => {
+  const stuck = await Document.find({ status: 'processing' }).select('_id filePath');
+  if (!stuck.length) return;
+
+  console.log(`Recovering ${stuck.length} document(s) stuck in processing`);
+
+  for (const doc of stuck) {
+    try {
+      const buffer = await downloadBufferFromR2(doc.filePath);
+      await processPDF(doc._id, buffer);
+    } catch (error) {
+      console.error(`Could not recover document ${doc._id}:`, error.message);
+      await Document.findByIdAndUpdate(doc._id, { status: 'failed' });
+    }
   }
 };
 
@@ -243,9 +265,10 @@ export const deleteDocument = async (req, res, next) => {
     // Remove the object from R2
     await deleteObjectFromR2(document.filePath).catch(() => {});
 
-    // Remove related flashcards and quizzes tied to this document
+    // Remove related flashcards, quizzes and chat history tied to this document
     await Flashcard.deleteMany({ documentId: document._id });
     await Quiz.deleteMany({ documentId: document._id });
+    await ChatHistory.deleteMany({ documentId: document._id });
 
     await document.deleteOne();
 
