@@ -8,6 +8,10 @@ import Button from "../../components/common/Button";
 import DocumentCard from "../../components/documents/DocumentCard";
 import Pagination from "../../components/common/Pagination";
 
+// Must match MAX_FILE_SIZE on the backend (multer rejects anything larger)
+const MAX_FILE_SIZE_MB = import.meta.env.VITE_MAX_FILE_SIZE_MB || 10;
+const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+
 const DocumentListPage = () => {
 
   const [documents, setDocuments] = useState([]);
@@ -52,10 +56,28 @@ const DocumentListPage = () => {
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
-    if (file) {
-      setUploadFile(file);
-      setUploadTitle(file.name.replace(/\.[^/.]+$/, ""));
+    if (!file) return;
+
+    // Checked here so the user isn't left waiting for a large upload that
+    // the server will reject anyway. Drag-and-drop ignores `accept`, so the
+    // type is checked too.
+    const isPdf = file.type === "application/pdf" || /\.pdf$/i.test(file.name);
+    const error = !isPdf
+      ? "Only PDF files are allowed."
+      : file.size > MAX_FILE_SIZE_BYTES
+        ? `File is too large (${(file.size / 1024 / 1024).toFixed(1)} MB). Maximum size is ${MAX_FILE_SIZE_MB} MB.`
+        : null;
+
+    if (error) {
+      toast.error(error);
+      // Clear the input so picking the same file again still fires onChange
+      e.target.value = "";
+      setUploadFile(null);
+      return;
     }
+
+    setUploadFile(file);
+    setUploadTitle(file.name.replace(/\.[^/.]+$/, ""));
   };
 
   const handleUpload = async (e) => {
@@ -257,7 +279,7 @@ const DocumentListPage = () => {
                       </>
                     )}
                   </p>
-                  <p className="text-xs text-slate-500">PDF upto 10MB</p>
+                  <p className="text-xs text-slate-500">PDF up to {MAX_FILE_SIZE_MB}MB</p>
                 </div>
               </div>
           </div>
