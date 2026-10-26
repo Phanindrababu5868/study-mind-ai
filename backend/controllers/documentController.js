@@ -120,52 +120,47 @@ export const recoverStuckDocuments = async () => {
 export const getDocuments = async (req, res, next) => {
   try {
     const { page, limit, skip } = getPagination(req);
-   const [result] = await Document.aggregate(
-        [
-            {
-        $match: {
-          userId: new mongoose.Types.ObjectId(req.user._id)
-        }
+    const userId = new mongoose.Types.ObjectId(req.user._id);
+
+    // Counts related items for one document without loading them. Matching
+    // on userId as well as documentId lets the {userId, documentId} index
+    // on flashcards/quizzes be used instead of scanning the collection.
+    const countRelated = (from, as) => ({
+      $lookup: {
+        from,
+        localField: '_id',
+        foreignField: 'documentId',
+        pipeline: [{ $match: { userId } }, { $count: 'count' }],
+        as,
       },
+    });
+
+    const [result] = await Document.aggregate([
+      { $match: { userId } },
+      // Drop the heavy text fields first so later stages never carry them
+      { $project: { extractedText: 0, chunks: 0 } },
+      { $sort: { uploadDate: -1 } },
       {
-        $lookup: {
-          from: 'flashcards',
-          localField: '_id',
-          foreignField: 'documentId',
-          as: 'flashcardSets'
-        }
-      },
-      {
-        $lookup: {
-          from: 'quizzes',
-          localField: '_id',
-          foreignField: 'documentId',
-          as: 'quizzes'
-        }
-      },
-      {
-        $addFields: {
-            flashcardCount: { $size: '$flashcardSets' },
-            quizCount: { $size: '$quizzes' }
-        }
-    },
-    {
-        $project: {
-            extractedText: 0,
-            chunks: 0,
-            flashcardSets: 0,
-            quizzes: 0}
-        },
-    { $sort: { uploadDate: -1 } },
-    {
-        // $facet runs both branches against the same post-match, post-sort
-        // pipeline in one round trip: `data` for the current page, `totalCount`
-        // for the total match count the page count is computed from.
+        // $facet runs both branches in one round trip: `data` for the current
+        // page, `totalCount` for the total the page count is computed from.
+        // Counts are looked up only for the documents on this page.
         $facet: {
-            data: [{ $skip: skip }, { $limit: limit }],
-            totalCount: [{ $count: 'count' }],
-        }
-    }])
+          data: [
+            { $skip: skip },
+            { $limit: limit },
+            countRelated('flashcards', 'flashcardCount'),
+            countRelated('quizzes', 'quizCount'),
+            {
+              $addFields: {
+                flashcardCount: { $ifNull: [{ $first: '$flashcardCount.count' }, 0] },
+                quizCount: { $ifNull: [{ $first: '$quizCount.count' }, 0] },
+              },
+            },
+          ],
+          totalCount: [{ $count: 'count' }],
+        },
+      },
+    ]);
 
     const documents = result?.data || [];
     const total = result?.totalCount?.[0]?.count || 0;
