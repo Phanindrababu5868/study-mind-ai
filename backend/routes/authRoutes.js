@@ -1,5 +1,5 @@
 import express from 'express'
-import { body, validationResult } from 'express-validator'
+import { body } from 'express-validator'
 import {
     register,
     login,
@@ -11,24 +11,9 @@ import {
 import { AGE_RANGES } from '../models/User.js'
 import { authLimiter } from '../middleware/rateLimiter.js'
 import protect from '../middleware/auth.js'
+import { runValidation } from '../middleware/validate.js'
 
 const router=express.Router()
-
-// express-validator's body() checks only *populate* errors on the request —
-// they don't reject anything by themselves. This middleware is what
-// actually turns those into a 400 response.
-const runValidation = (req, res, next) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(400).json({
-      success: false,
-      message: errors.array()[0].msg,
-      errors: errors.array(),
-      statusCode: 400,
-    });
-  }
-  next();
-};
 
 // Validation middleware
 const registerValidation = [
@@ -77,6 +62,51 @@ const loginValidation = [
     .withMessage('Password is required'),
 ];
 
+// All fields optional — only the ones sent are checked and updated
+const updateProfileValidation = [
+  body('username')
+    .optional()
+    .trim()
+    .isLength({ min: 3 })
+    .withMessage('Username must be at least 3 characters'),
+
+  body('email')
+    .optional()
+    .isEmail()
+    .normalizeEmail()
+    .withMessage('Please provide a valid email'),
+
+  body('ageRange')
+    .optional()
+    .isIn(AGE_RANGES)
+    .withMessage('Please provide a valid age range'),
+
+  body('occupation')
+    .optional()
+    .trim()
+    .notEmpty()
+    .withMessage('Occupation cannot be empty')
+    .isLength({ max: 120 })
+    .withMessage('Occupation must be no more than 120 characters'),
+
+  body('profileImage')
+    .optional()
+    .isURL({ protocols: ['http', 'https'], require_protocol: true })
+    .withMessage('Profile image must be a valid http(s) URL'),
+];
+
+// Strength rules for newPassword are checked in the controller
+// (validatePassword), which also returns the failed rules to the UI.
+const changePasswordValidation = [
+  body('currentPassword')
+    .notEmpty()
+    .withMessage('Please provide your current password'),
+
+  body('newPassword')
+    .notEmpty()
+    .withMessage('Please provide a new password'),
+];
+
 // Public routes
 router.post('/register',authLimiter, registerValidation, runValidation, register);
 router.post('/login',authLimiter, loginValidation, runValidation, login);
@@ -84,7 +114,7 @@ router.post('/logout', logout);
 
 // Protected routes
 router.get('/profile', protect, getProfile);
-router.put('/profile', protect, updateProfile);
-router.post('/change-password', protect, changePassword);
+router.put('/profile', protect, updateProfileValidation, runValidation, updateProfile);
+router.post('/change-password', protect, changePasswordValidation, runValidation, changePassword);
 
 export default router

@@ -48,7 +48,7 @@ export const getQuizById = async (req, res, next) => {
     if (!quiz) {
       return res.status(404).json({
         success: false,
-        error: 'Quiz not found',
+        message: 'Quiz not found',
         statusCode: 404
       });
     }
@@ -80,7 +80,7 @@ export const submitQuiz = async (req, res, next) => {
     if (!Array.isArray(answers)) {
       return res.status(400).json({
         success: false,
-        error: 'Please provide answers array',
+        message: 'Please provide answers array',
         statusCode: 400
       });
     }
@@ -93,7 +93,7 @@ export const submitQuiz = async (req, res, next) => {
     if (!quiz) {
       return res.status(404).json({
         success: false,
-        error: 'Quiz not found',
+        message: 'Quiz not found',
         statusCode: 404
       });
     }
@@ -101,7 +101,7 @@ export const submitQuiz = async (req, res, next) => {
     if (quiz.completedAt) {
       return res.status(400).json({
         success: false,
-        error: 'Quiz already completed',
+        message: 'Quiz already completed',
         statusCode: 400
       });
     }
@@ -179,7 +179,7 @@ export const getQuizResults = async (req, res, next) => {
     if (!quiz) {
       return res.status(404).json({
         success: false,
-        error: 'Quiz not found',
+        message: 'Quiz not found',
         statusCode: 404
       });
     }
@@ -187,7 +187,7 @@ export const getQuizResults = async (req, res, next) => {
     if (!quiz.completedAt) {
       return res.status(400).json({
         success: false,
-        error: 'Quiz not completed yet',
+        message: 'Quiz not completed yet',
         statusCode: 400
       });
     }
@@ -239,7 +239,7 @@ export const deleteQuiz = async (req, res, next) => {
     if (!quiz) {
       return res.status(404).json({
         success: false,
-        error: 'Quiz not found',
+        message: 'Quiz not found',
         statusCode: 404
       });
     }
